@@ -196,6 +196,12 @@ app.delete("/texts/:id", authenticateToken, isAdmin, (req, res) => {
   else res.status(404).json({ error: "Text not found" });
 });
 
-app.listen(PORT, () => {
-  console.log(`API listening on http://localhost:${PORT}`);
-});
+// For local development
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`API listening on http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel serverless
+export default app;
