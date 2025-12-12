@@ -41,7 +41,10 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
-
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
 // Auth Routes
 app.post("/auth/login", (req, res) => {
   const code = (req.body.code || "").trim();
