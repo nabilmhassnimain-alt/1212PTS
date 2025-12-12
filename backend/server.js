@@ -90,11 +90,15 @@ app.post("/auth/generate", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-app.get("/admin/codes", authenticateToken, isAdmin, (req, res) => {
-  const allCodes = getAllTexts().codes || [];
-  // Only return active codes by default
-  const activeCodes = allCodes.filter(c => c.active !== false);
-  res.json(activeCodes);
+app.get("/admin/codes", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const allCodes = (await getAllTexts()).codes || [];
+    const activeCodes = allCodes.filter(c => c.active !== false);
+    res.json(activeCodes);
+  } catch (error) {
+    console.error('Error getting codes:', error);
+    res.status(500).json({ error: "Failed to get codes" });
+  }
 });
 
 // Revoke code by ID
@@ -150,23 +154,41 @@ app.delete("/vocabulary/:type", authenticateToken, async (req, res) => {
   const result = deleteVocabularyItem(type, value);
   res.json(result);
 });
-
-// Texts Routes
-app.get("/texts", authenticateToken, (req, res) => {
-  const allData = getAllTexts();
-  const texts = allData.texts || [];
-  if (req.user.role === 'admin') {
-    res.json(texts);
-  } else {
-    res.json(texts.filter(t => t.status === 'active'));
+app.get("/texts", authenticateToken, async (req, res) => {
+  try {
+    const allData = await getAllTexts();
+    const texts = allData.texts || [];
+    if (req.user.role === 'admin') {
+      res.json(texts);
+    } else {
+      res.json(texts.filter(t => t.status === 'active'));
+    }
+  } catch (error) {
+    console.error('Error getting texts:', error);
+    res.status(500).json({ error: "Failed to get texts" });
   }
 });
-
-app.post("/texts", authenticateToken, (req, res) => {
+app.post("/texts", authenticateToken, async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'mod') {
     return res.status(403).json({ error: "Forbidden" });
   }
 
+  const { primary, translations, tags, playlists } = req.body;
+  if (!primary) {
+    return res.status(400).json({ error: "Primary text is required" });
+  }
+
+  const safeTranslations = translations || {};
+  const status = req.user.role === 'admin' ? 'active' : 'pending';
+  
+  try {
+    const newItem = await addText({ primary, translations: safeTranslations, tags, playlists }, status);
+    res.status(201).json(newItem);
+  } catch (error) {
+    console.error('Error adding text:', error);
+    res.status(500).json({ error: "Failed to create text" });
+  }
+});
   // Expect { primary, translations: {}, tags: [], playlists: [] }
   const { primary, translations, tags, playlists } = req.body;
   if (!primary) {
