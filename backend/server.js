@@ -75,15 +75,19 @@ app.post("/auth/logout", (req, res) => {
   res.json({ message: "Logged out" });
 });
 
-app.post("/auth/generate", authenticateToken, isAdmin, (req, res) => {
+app.post("/auth/generate", authenticateToken, isAdmin, async (req, res) => {
   const { role, label } = req.body;
   if (!['mod', 'user'].includes(role)) return res.status(400).json({ error: "Invalid role" });
 
-  // Get current admin user from token (for createdBy)
   const createdBy = req.user.role === 'admin' ? 'admin' : 'system';
 
-  const codeRecord = generateCode(role, label || "", createdBy);
-  res.json(codeRecord);
+  try {
+    const codeRecord = await generateCode(role, label || "", createdBy);
+    res.json(codeRecord);
+  } catch (error) {
+    console.error('Error generating code:', error);
+    res.status(500).json({ error: "Failed to generate code" });
+  }
 });
 
 app.get("/admin/codes", authenticateToken, isAdmin, (req, res) => {
