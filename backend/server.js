@@ -32,7 +32,11 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:5174"],
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://1212-pts-gleo.vercel.app"
+  ],
   credentials: true,
 }));
 app.use(express.json());
