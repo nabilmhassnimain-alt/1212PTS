@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 import {
   getAllTexts,
   addText,
-  getCodeRole,
   getCodeRecord,
   generateCode,
   revokeCode,
@@ -31,6 +30,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Health check
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
 app.use(cors({
   origin: [
     "http://localhost:5173",
@@ -41,20 +45,24 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
-// Health check endpoint
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
+
 // Auth Routes
-app.post("/auth/login", (req, res) => {
+app.post("/auth/login", async (req, res) => {
   const code = (req.body.code || "").trim();
   console.log("Login attempt with code:", code);
 
   let role = null;
   if (ADMIN_CODES.includes(code)) role = "admin";
   else if (USER_CODES.includes(code)) role = "user";
-
-  if (!role) role = getCodeRole(code);
+  
+  if (!role) {
+    try {
+      const codeRecord = await getCodeRecord(code);
+      if (codeRecord) role = codeRecord.role;
+    } catch (error) {
+      console.error('Error checking code:', error);
+    }
+  }
 
   console.log("Determined role:", role);
 
@@ -101,24 +109,38 @@ app.get("/admin/codes", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Revoke code by ID
-app.delete("/admin/codes/:id", authenticateToken, isAdmin, (req, res) => {
-  const revoked = revokeCode(req.params.id);
-  if (revoked) res.json(revoked);
-  else res.status(404).json({ error: "Code not found" });
+app.delete("/admin/codes/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const revoked = await revokeCode(req.params.id);
+    if (revoked) res.json(revoked);
+    else res.status(404).json({ error: "Code not found" });
+  } catch (error) {
+    console.error('Error revoking code:', error);
+    res.status(500).json({ error: "Failed to revoke code" });
+  }
 });
 
-// Update code label
-app.put("/admin/codes/:id/label", authenticateToken, isAdmin, (req, res) => {
-  const { label } = req.body;
-  const updated = updateCodeLabel(req.params.id, label);
-  if (updated) res.json(updated);
-  else res.status(404).json({ error: "Code not found" });
+app.put("/admin/codes/:id/label", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { label } = req.body;
+    const updated = await updateCodeLabel(req.params.id, label);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Code not found" });
+  } catch (error) {
+    console.error('Error updating code label:', error);
+    res.status(500).json({ error: "Failed to update code label" });
+  }
 });
 
 // Vocabulary Routes
-app.get("/vocabulary", authenticateToken, (req, res) => {
-  res.json(getAllTexts().vocabulary || { tags: [], playlists: [] });
+app.get("/vocabulary", authenticateToken, async (req, res) => {
+  try {
+    const data = await getAllTexts();
+    res.json(data.vocabulary || { tags: [], playlists: [] });
+  } catch (error) {
+    console.error('Error getting vocabulary:', error);
+    res.status(500).json({ error: "Failed to get vocabulary" });
+  }
 });
 
 app.post("/vocabulary/:type", authenticateToken, async (req, res) => {
@@ -127,10 +149,13 @@ app.post("/vocabulary/:type", authenticateToken, async (req, res) => {
   const { value } = req.body;
   if (!['tags', 'playlists'].includes(type)) return res.status(400).json({ error: "Invalid type" });
 
-  // Import dynamically to avoid circular dependency issues if any, or just to fix the syntax error context
-  // const dataStore = await import("./dataStore.js");
-  const result = addVocabularyItem(type, value);
-  res.json(result);
+  try {
+    const result = await addVocabularyItem(type, value);
+    res.json(result);
+  } catch (error) {
+    console.error('Error adding vocabulary item:', error);
+    res.status(500).json({ error: "Failed to add vocabulary item" });
+  }
 });
 
 app.put("/vocabulary/:type", authenticateToken, async (req, res) => {
@@ -139,9 +164,13 @@ app.put("/vocabulary/:type", authenticateToken, async (req, res) => {
   const { oldVal, newVal } = req.body;
   if (!['tags', 'playlists'].includes(type)) return res.status(400).json({ error: "Invalid type" });
 
-  // const dataStore = await import("./dataStore.js");
-  const result = renameVocabularyItem(type, oldVal, newVal);
-  res.json(result);
+  try {
+    const result = await renameVocabularyItem(type, oldVal, newVal);
+    res.json(result);
+  } catch (error) {
+    console.error('Error renaming vocabulary item:', error);
+    res.status(500).json({ error: "Failed to rename vocabulary item" });
+  }
 });
 
 app.delete("/vocabulary/:type", authenticateToken, async (req, res) => {
@@ -150,10 +179,16 @@ app.delete("/vocabulary/:type", authenticateToken, async (req, res) => {
   const { value } = req.body;
   if (!['tags', 'playlists'].includes(type)) return res.status(400).json({ error: "Invalid type" });
 
-  // const dataStore = await import("./dataStore.js");
-  const result = deleteVocabularyItem(type, value);
-  res.json(result);
+  try {
+    const result = await deleteVocabularyItem(type, value);
+    res.json(result);
+  } catch (error) {
+    console.error('Error deleting vocabulary item:', error);
+    res.status(500).json({ error: "Failed to delete vocabulary item" });
+  }
 });
+
+// Texts Routes
 app.get("/texts", authenticateToken, async (req, res) => {
   try {
     const allData = await getAllTexts();
@@ -168,6 +203,7 @@ app.get("/texts", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to get texts" });
   }
 });
+
 app.post("/texts", authenticateToken, async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'mod') {
     return res.status(403).json({ error: "Forbidden" });
@@ -189,40 +225,42 @@ app.post("/texts", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to create text" });
   }
 });
-  // Expect { primary, translations: {}, tags: [], playlists: [] }
-  const { primary, translations, tags, playlists } = req.body;
-  if (!primary) {
-    return res.status(400).json({ error: "Primary text is required" });
+
+app.put("/texts/:id/approve", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const updated = await updateTextStatus(req.params.id, 'active');
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Text not found" });
+  } catch (error) {
+    console.error('Error approving text:', error);
+    res.status(500).json({ error: "Failed to approve text" });
   }
-
-  // Ensure translations is an object
-  const safeTranslations = translations || {};
-
-  const status = req.user.role === 'admin' ? 'active' : 'pending';
-  const newItem = addText({ primary, translations: safeTranslations, tags, playlists }, status);
-  res.status(201).json(newItem);
 });
 
-app.put("/texts/:id/approve", authenticateToken, isAdmin, (req, res) => {
-  const updated = updateTextStatus(req.params.id, 'active');
-  if (updated) res.json(updated);
-  else res.status(404).json({ error: "Text not found" });
-});
-
-app.put("/texts/:id", authenticateToken, (req, res) => {
+app.put("/texts/:id", authenticateToken, async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'mod') {
     return res.status(403).json({ error: "Forbidden" });
   }
 
-  const updates = req.body;
-  const updated = updateText(req.params.id, updates);
-  if (updated) res.json(updated);
-  else res.status(404).json({ error: "Text not found" });
+  try {
+    const updates = req.body;
+    const updated = await updateText(req.params.id, updates);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Text not found" });
+  } catch (error) {
+    console.error('Error updating text:', error);
+    res.status(500).json({ error: "Failed to update text" });
+  }
 });
 
-app.delete("/texts/:id", authenticateToken, isAdmin, (req, res) => {
-  if (deleteText(req.params.id)) res.json({ message: "Text deleted" });
-  else res.status(404).json({ error: "Text not found" });
+app.delete("/texts/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    if (await deleteText(req.params.id)) res.json({ message: "Text deleted" });
+    else res.status(404).json({ error: "Text not found" });
+  } catch (error) {
+    console.error('Error deleting text:', error);
+    res.status(500).json({ error: "Failed to delete text" });
+  }
 });
 
 // For local development
@@ -232,5 +270,5 @@ if (process.env.VERCEL !== '1') {
   });
 }
 
-// Export for Vercel serverless
+// Export for Vercel
 export default app;
