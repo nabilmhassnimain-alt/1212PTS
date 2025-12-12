@@ -35,7 +35,7 @@ app.use(cors({
   origin: [
     "http://localhost:5173",
     "http://localhost:5174",
-    "https://1212-pts-gleo.vercel.app"
+    "https://mt-pt.vercel.app"
   ],
   credentials: true,
 }));
