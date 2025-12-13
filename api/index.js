@@ -354,8 +354,8 @@ router.get("/texts", authenticateToken, async (req, res) => {
       res.json(texts);
     }
   } catch (error) {
-    console.error("Get texts error:", error);
-    return res.status(500).json({ error: "Failed to retrieve texts" });
+    console.error("API Error:", error);
+    res.status(500).json({ error: error.message || "Internal Server Error" });
   }
 });
 
@@ -380,8 +380,7 @@ router.post("/texts", authenticateToken, async (req, res) => {
   } catch (error) {
     console.error("Add text error:", error);
     return res.status(500).json({
-      error: "Failed to create text",
-      details: error.message
+      error: error.message || "Failed to create text"
     });
   }
 });
