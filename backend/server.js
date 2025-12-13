@@ -45,6 +45,18 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+// Middleware to ensure database connection before handling requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Database connection error:", error);
+    return res.status(500).json({ error: "Database connection failed" });
+  }
+});
+
+
 // Auth Routes
 app.post("/auth/login", async (req, res) => {
   try {
@@ -277,20 +289,15 @@ app.delete("/texts/:id", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Initialize database and start server
-async function startServer() {
-  try {
-    // Connect to MongoDB
-    await connectDB();
-
-    // Start Express server
-    app.listen(PORT, () => {
-      console.log(`🚀 API listening on http://localhost:${PORT}`);
-    });
-  } catch (error) {
-    console.error("Failed to start server:", error);
-    process.exit(1);
-  }
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, () => {
+    console.log(`🚀 API listening on http://localhost:${PORT}`);
+  });
 }
 
-startServer();
+// Export for Vercel serverless
+export default app;
+
+
