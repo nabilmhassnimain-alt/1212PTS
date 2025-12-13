@@ -84,6 +84,7 @@ router.get("/health", (req, res) => {
   res.json({
     status: "ok",
     mongodb: !!process.env.MONGODB_URI,
+    jwt: !!process.env.JWT_SECRET,
     timestamp: new Date().toISOString()
   });
 });
@@ -139,292 +140,300 @@ router.post("/auth/login", async (req, res) => {
         userCodesLength: USER_CODES.length
       }
     });
-
-    router.get("/auth/me", authenticateToken, (req, res) => {
-      res.json({ role: req.user.role, label: req.user.label });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({
+      error: error.message || "Internal server error",
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
+  }
+});
 
-    router.post("/auth/logout", (req, res) => {
-      const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
-      res.clearCookie("token", {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? "none" : "lax"
-      });
-      res.json({ message: "Logged out" });
-    });
+router.get("/auth/me", authenticateToken, (req, res) => {
+  res.json({ role: req.user.role, label: req.user.label });
+});
+
+router.post("/auth/logout", (req, res) => {
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax"
+  });
+  res.json({ message: "Logged out" });
+});
 
 
-    router.post("/auth/generate", authenticateToken, isAdmin, async (req, res) => {
-      try {
-        const { role, label } = req.body;
-        if (!['mod', 'user'].includes(role)) {
-          return res.status(400).json({ error: "Invalid role" });
-        }
-
-        const createdBy = req.user.role === 'admin' ? 'admin' : 'system';
-        const codeRecord = await generateCode(role, label || "", createdBy);
-        res.json(codeRecord);
-      } catch (error) {
-        console.error("Generate code error:", error);
-        // Return detailed error for debugging
-        return res.status(500).json({
-          error: "Failed to generate code",
-          details: error.message,
-          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
-      }
-    });
-
-    router.get("/admin/codes", authenticateToken, isAdmin, async (req, res) => {
-      try {
-        const activeCodes = await getAllCodes(false);
-        res.json(activeCodes);
-      } catch (error) {
-        console.error("Get codes error:", error);
-        return res.status(500).json({ error: "Failed to retrieve codes" });
-      }
-    });
-
-    // Revoke code by ID
-    router.delete("/admin/codes/:id", authenticateToken, isAdmin, async (req, res) => {
-      try {
-        const revoked = await revokeCode(req.params.id);
-        if (revoked) res.json(revoked);
-        else res.status(404).json({ error: "Code not found" });
-      } catch (error) {
-        console.error("Revoke code error:", error);
-        return res.status(500).json({ error: "Failed to revoke code" });
-      }
-    });
-
-    // Update code label
-    router.put("/admin/codes/:id/label", authenticateToken, isAdmin, async (req, res) => {
-      try {
-        const { label } = req.body;
-        const updated = await updateCodeLabel(req.params.id, label);
-        if (updated) res.json(updated);
-        else res.status(404).json({ error: "Code not found" });
-      } catch (error) {
-        console.error("Update label error:", error);
-        return res.status(500).json({ error: "Failed to update label" });
-      }
-    });
-
-    // Vocabulary Routes
-    router.get("/vocabulary", authenticateToken, async (req, res) => {
-      try {
-        const vocab = await getVocabulary();
-        res.json(vocab);
-      } catch (error) {
-        console.error("Get vocabulary error:", error);
-        return res.status(500).json({ error: "Failed to retrieve vocabulary" });
-      }
-    });
-
-    router.post("/vocabulary/:type", authenticateToken, async (req, res) => {
-      try {
-        if (req.user.role !== 'admin' && req.user.role !== 'mod') {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-        const { type } = req.params;
-        const { value } = req.body;
-        if (!['tags', 'playlists'].includes(type)) {
-          return res.status(400).json({ error: "Invalid type" });
-        }
-
-        const result = await addVocabularyItem(type, value);
-        res.json(result);
-      } catch (error) {
-        console.error("Add vocabulary error:", error);
-        return res.status(500).json({ error: "Failed to add vocabulary item" });
-      }
-    });
-
-    router.put("/vocabulary/:type", authenticateToken, async (req, res) => {
-      try {
-        if (req.user.role !== 'admin' && req.user.role !== 'mod') {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-        const { type } = req.params;
-        const { oldVal, newVal } = req.body;
-        if (!['tags', 'playlists'].includes(type)) {
-          return res.status(400).json({ error: "Invalid type" });
-        }
-
-        const result = await renameVocabularyItem(type, oldVal, newVal);
-        res.json(result);
-      } catch (error) {
-        console.error("Rename vocabulary error:", error);
-        return res.status(500).json({ error: "Failed to rename vocabulary item" });
-      }
-    });
-
-    router.delete("/vocabulary/:type", authenticateToken, async (req, res) => {
-      try {
-        if (req.user.role !== 'admin' && req.user.role !== 'mod') {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-        const { type } = req.params;
-        const { value } = req.body;
-        if (!['tags', 'playlists'].includes(type)) {
-          return res.status(400).json({ error: "Invalid type" });
-        }
-
-        const result = await deleteVocabularyItem(type, value);
-        res.json(result);
-      } catch (error) {
-        console.error("Delete vocabulary error:", error);
-        return res.status(500).json({ error: "Failed to delete vocabulary item" });
-      }
-    });
-
-    // Suggestion Routes
-    router.post("/suggestions", authenticateToken, async (req, res) => {
-      try {
-        const { content } = req.body;
-        if (!content) return res.status(400).json({ error: "Content required" });
-
-        // Store role and label in author object
-        const author = {
-          role: req.user.role,
-          label: req.user.label || null
-        };
-        const saved = await addSuggestion(content, author);
-        res.status(201).json(saved);
-      } catch (error) {
-        console.error("Add suggestion error:", error);
-        res.status(500).json({ error: "Failed to add suggestion" });
-      }
-    });
-
-    router.get("/admin/suggestions", authenticateToken, isAdmin, async (req, res) => {
-      try {
-        const items = await getSuggestions();
-        res.json(items);
-      } catch (error) {
-        console.error("Get suggestions error:", error);
-        res.status(500).json({ error: "Failed to retrieve suggestions" });
-      }
-    });
-
-    router.put("/admin/suggestions/:id/status", authenticateToken, isAdmin, async (req, res) => {
-      try {
-        const { status } = req.body;
-        const updated = await updateSuggestionStatus(req.params.id, status);
-        if (updated) res.json(updated);
-        else res.status(404).json({ error: "Suggestion not found" });
-      } catch (error) {
-        console.error("Update suggestion status error:", error);
-        res.status(500).json({ error: "Failed to update status" });
-      }
-    });
-
-    router.delete("/admin/suggestions/:id", authenticateToken, isAdmin, async (req, res) => {
-      try {
-        const deleted = await deleteSuggestion(req.params.id);
-        if (deleted) res.json({ message: "Suggestion deleted" });
-        else res.status(404).json({ error: "Suggestion not found" });
-      } catch (error) {
-        console.error("Delete suggestion error:", error);
-        res.status(500).json({ error: "Failed to delete suggestion" });
-      }
-    });
-
-    // Texts Routes
-    router.get("/texts", authenticateToken, async (req, res) => {
-      try {
-        if (req.user.role === 'admin') {
-          const texts = await getAllTexts();
-          res.json(texts);
-        } else {
-          const texts = await getAllTexts('active');
-          res.json(texts);
-        }
-      } catch (error) {
-        console.error("Get texts error:", error);
-        return res.status(500).json({ error: "Failed to retrieve texts" });
-      }
-    });
-
-    router.post("/texts", authenticateToken, async (req, res) => {
-      try {
-        if (req.user.role !== 'admin' && req.user.role !== 'mod') {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-
-        const { primary, translations, tags, playlists } = req.body;
-        if (!primary) {
-          return res.status(400).json({ error: "Primary text is required" });
-        }
-
-        const safeTranslations = translations || {};
-        const status = req.user.role === 'admin' ? 'active' : 'pending';
-        const newItem = await addText(
-          { primary, translations: safeTranslations, tags, playlists },
-          status
-        );
-        res.status(201).json(newItem);
-      } catch (error) {
-        console.error("Add text error:", error);
-        return res.status(500).json({
-          error: "Failed to create text",
-          details: error.message
-        });
-      }
-    });
-
-    router.put("/texts/:id/approve", authenticateToken, isAdmin, async (req, res) => {
-      try {
-        const updated = await updateTextStatus(req.params.id, 'active');
-        if (updated) res.json(updated);
-        else res.status(404).json({ error: "Text not found" });
-      } catch (error) {
-        console.error("Approve text error:", error);
-        return res.status(500).json({ error: "Failed to approve text" });
-      }
-    });
-
-    router.put("/texts/:id", authenticateToken, async (req, res) => {
-      try {
-        if (req.user.role !== 'admin' && req.user.role !== 'mod') {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-
-        const updates = req.body;
-        const updated = await updateText(req.params.id, updates);
-        if (updated) res.json(updated);
-        else res.status(404).json({ error: "Text not found" });
-      } catch (error) {
-        console.error("Update text error:", error);
-        return res.status(500).json({ error: "Failed to update text" });
-      }
-    });
-
-    router.delete("/texts/:id", authenticateToken, isAdmin, async (req, res) => {
-      try {
-        const deleted = await deleteText(req.params.id);
-        if (deleted) res.json({ message: "Text deleted" });
-        else res.status(404).json({ error: "Text not found" });
-      } catch (error) {
-        console.error("Delete text error:", error);
-        return res.status(500).json({ error: "Failed to delete text" });
-      }
-    });
-
-    // Mount the router on both / and /api to handle Vercel rewrites correctly
-    app.use('/', router);
-    app.use('/api', router);
-
-    // For local development
-    if (process.env.NODE_ENV !== 'production') {
-      const PORT = process.env.PORT || 4000;
-      app.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 API listening on http://0.0.0.0:${PORT}`);
-      });
+router.post("/auth/generate", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { role, label } = req.body;
+    if (!['mod', 'user'].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
     }
 
-    // Export for Vercel serverless
-    export default app;
+    const createdBy = req.user.role === 'admin' ? 'admin' : 'system';
+    const codeRecord = await generateCode(role, label || "", createdBy);
+    res.json(codeRecord);
+  } catch (error) {
+    console.error("Generate code error:", error);
+    // Return detailed error for debugging
+    return res.status(500).json({
+      error: "Failed to generate code",
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+router.get("/admin/codes", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const activeCodes = await getAllCodes(false);
+    res.json(activeCodes);
+  } catch (error) {
+    console.error("Get codes error:", error);
+    return res.status(500).json({ error: "Failed to retrieve codes" });
+  }
+});
+
+// Revoke code by ID
+router.delete("/admin/codes/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const revoked = await revokeCode(req.params.id);
+    if (revoked) res.json(revoked);
+    else res.status(404).json({ error: "Code not found" });
+  } catch (error) {
+    console.error("Revoke code error:", error);
+    return res.status(500).json({ error: "Failed to revoke code" });
+  }
+});
+
+// Update code label
+router.put("/admin/codes/:id/label", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { label } = req.body;
+    const updated = await updateCodeLabel(req.params.id, label);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Code not found" });
+  } catch (error) {
+    console.error("Update label error:", error);
+    return res.status(500).json({ error: "Failed to update label" });
+  }
+});
+
+// Vocabulary Routes
+router.get("/vocabulary", authenticateToken, async (req, res) => {
+  try {
+    const vocab = await getVocabulary();
+    res.json(vocab);
+  } catch (error) {
+    console.error("Get vocabulary error:", error);
+    return res.status(500).json({ error: "Failed to retrieve vocabulary" });
+  }
+});
+
+router.post("/vocabulary/:type", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'mod') {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { type } = req.params;
+    const { value } = req.body;
+    if (!['tags', 'playlists'].includes(type)) {
+      return res.status(400).json({ error: "Invalid type" });
+    }
+
+    const result = await addVocabularyItem(type, value);
+    res.json(result);
+  } catch (error) {
+    console.error("Add vocabulary error:", error);
+    return res.status(500).json({ error: "Failed to add vocabulary item" });
+  }
+});
+
+router.put("/vocabulary/:type", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'mod') {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { type } = req.params;
+    const { oldVal, newVal } = req.body;
+    if (!['tags', 'playlists'].includes(type)) {
+      return res.status(400).json({ error: "Invalid type" });
+    }
+
+    const result = await renameVocabularyItem(type, oldVal, newVal);
+    res.json(result);
+  } catch (error) {
+    console.error("Rename vocabulary error:", error);
+    return res.status(500).json({ error: "Failed to rename vocabulary item" });
+  }
+});
+
+router.delete("/vocabulary/:type", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'mod') {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { type } = req.params;
+    const { value } = req.body;
+    if (!['tags', 'playlists'].includes(type)) {
+      return res.status(400).json({ error: "Invalid type" });
+    }
+
+    const result = await deleteVocabularyItem(type, value);
+    res.json(result);
+  } catch (error) {
+    console.error("Delete vocabulary error:", error);
+    return res.status(500).json({ error: "Failed to delete vocabulary item" });
+  }
+});
+
+// Suggestion Routes
+router.post("/suggestions", authenticateToken, async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) return res.status(400).json({ error: "Content required" });
+
+    // Store role and label in author object
+    const author = {
+      role: req.user.role,
+      label: req.user.label || null
+    };
+    const saved = await addSuggestion(content, author);
+    res.status(201).json(saved);
+  } catch (error) {
+    console.error("Add suggestion error:", error);
+    res.status(500).json({ error: "Failed to add suggestion" });
+  }
+});
+
+router.get("/admin/suggestions", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const items = await getSuggestions();
+    res.json(items);
+  } catch (error) {
+    console.error("Get suggestions error:", error);
+    res.status(500).json({ error: "Failed to retrieve suggestions" });
+  }
+});
+
+router.put("/admin/suggestions/:id/status", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const updated = await updateSuggestionStatus(req.params.id, status);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Suggestion not found" });
+  } catch (error) {
+    console.error("Update suggestion status error:", error);
+    res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+router.delete("/admin/suggestions/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const deleted = await deleteSuggestion(req.params.id);
+    if (deleted) res.json({ message: "Suggestion deleted" });
+    else res.status(404).json({ error: "Suggestion not found" });
+  } catch (error) {
+    console.error("Delete suggestion error:", error);
+    res.status(500).json({ error: "Failed to delete suggestion" });
+  }
+});
+
+// Texts Routes
+router.get("/texts", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      const texts = await getAllTexts();
+      res.json(texts);
+    } else {
+      const texts = await getAllTexts('active');
+      res.json(texts);
+    }
+  } catch (error) {
+    console.error("Get texts error:", error);
+    return res.status(500).json({ error: "Failed to retrieve texts" });
+  }
+});
+
+router.post("/texts", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'mod') {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const { primary, translations, tags, playlists } = req.body;
+    if (!primary) {
+      return res.status(400).json({ error: "Primary text is required" });
+    }
+
+    const safeTranslations = translations || {};
+    const status = req.user.role === 'admin' ? 'active' : 'pending';
+    const newItem = await addText(
+      { primary, translations: safeTranslations, tags, playlists },
+      status
+    );
+    res.status(201).json(newItem);
+  } catch (error) {
+    console.error("Add text error:", error);
+    return res.status(500).json({
+      error: "Failed to create text",
+      details: error.message
+    });
+  }
+});
+
+router.put("/texts/:id/approve", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const updated = await updateTextStatus(req.params.id, 'active');
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Text not found" });
+  } catch (error) {
+    console.error("Approve text error:", error);
+    return res.status(500).json({ error: "Failed to approve text" });
+  }
+});
+
+router.put("/texts/:id", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'mod') {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const updates = req.body;
+    const updated = await updateText(req.params.id, updates);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Text not found" });
+  } catch (error) {
+    console.error("Update text error:", error);
+    return res.status(500).json({ error: "Failed to update text" });
+  }
+});
+
+router.delete("/texts/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const deleted = await deleteText(req.params.id);
+    if (deleted) res.json({ message: "Text deleted" });
+    else res.status(404).json({ error: "Text not found" });
+  } catch (error) {
+    console.error("Delete text error:", error);
+    return res.status(500).json({ error: "Failed to delete text" });
+  }
+});
+
+// Mount the router on both / and /api to handle Vercel rewrites correctly
+app.use('/', router);
+app.use('/api', router);
+
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 API listening on http://0.0.0.0:${PORT}`);
+  });
+}
+
+// Export for Vercel serverless
+export default app;
 
 
