@@ -18,58 +18,54 @@ export async function connectDB() {
     const uri = process.env.MONGODB_URI;
 
     if (!uri) {
-        console.error("❌ MONGODB_URI not set");
+        console.error("❌ MONGODB_URI not set. Available env vars:", Object.keys(process.env).filter(k => !k.includes('SECRET')));
         throw new Error("MONGODB_URI environment variable is not defined");
     }
+
+    console.log("🔌 MONGODB_URI exists, length:", uri.length);
+    console.log("🔌 URI starts with:", uri.substring(0, 20) + "...");
 
     // Create connection promise to handle concurrent requests
     connectionPromise = (async () => {
         try {
-            console.log("🔌 Connecting to MongoDB...");
-            client = new MongoClient(uri);
+            console.log("🔌 Creating MongoClient...");
+            client = new MongoClient(uri, {
+                serverSelectionTimeoutMS: 10000,
+                connectTimeoutMS: 10000,
+            });
+
+            console.log("🔌 Calling client.connect()...");
             await client.connect();
+            console.log("🔌 client.connect() succeeded!");
 
-            // Parse database name from URI
-            // URI format: mongodb+srv://user:pass@cluster.mongodb.net/dbname?options
-            let dbName = "translationdb"; // default
-            try {
-                const url = new URL(uri.replace("mongodb+srv://", "https://").replace("mongodb://", "https://"));
-                const pathParts = url.pathname.split("/").filter(Boolean);
-                if (pathParts.length > 0) {
-                    dbName = pathParts[0];
-                }
-            } catch (e) {
-                console.log("Using default database name:", dbName);
-            }
-
+            // Use fixed database name to avoid parsing issues
+            const dbName = "translationdb";
             db = client.db(dbName);
+
             console.log(`✅ Connected to MongoDB: ${dbName}`);
 
             // Create indexes (but don't fail if they already exist)
-            await createIndexes();
+            try {
+                await db.collection("texts").createIndex({ status: 1 });
+                await db.collection("texts").createIndex({ createdAt: -1 });
+                await db.collection("codes").createIndex({ code: 1 });
+                await db.collection("codes").createIndex({ active: 1 });
+                console.log("✅ Database indexes created");
+            } catch (indexError) {
+                console.log("ℹ️ Index setup:", indexError.message);
+            }
 
             return db;
         } catch (error) {
             console.error("❌ MongoDB connection error:", error.message);
+            console.error("❌ Error name:", error.name);
+            console.error("❌ Error code:", error.code);
             connectionPromise = null; // Reset so we can retry
             throw error;
         }
     })();
 
     return connectionPromise;
-}
-
-async function createIndexes() {
-    try {
-        await db.collection("texts").createIndex({ status: 1 });
-        await db.collection("texts").createIndex({ createdAt: -1 });
-        await db.collection("codes").createIndex({ code: 1 });
-        await db.collection("codes").createIndex({ active: 1 });
-        console.log("✅ Database indexes created");
-    } catch (error) {
-        // Indexes might already exist, that's fine
-        console.log("ℹ️  Index setup:", error.message);
-    }
 }
 
 export function getDB() {
