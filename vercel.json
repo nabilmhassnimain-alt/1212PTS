@@ -9,11 +9,5 @@
             "source": "/(.*)",
             "destination": "/frontend/index.html"
         }
-    ],
-    "functions": {
-        "backend/server.js": {
-            "maxDuration": 10,
-            "memory": 1024
-        }
-    }
+    ]
 }
