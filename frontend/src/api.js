@@ -21,6 +21,13 @@ import {
 // Map Firestore docs to objects with IDs
 const mapDoc = (d) => ({ id: d.id, ...d.data() });
 
+const withTimeout = (promise, ms = 15000) => {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out (Firewall/Network issue?)")), ms))
+    ]);
+};
+
 // ==================== AUTH ====================
 
 // Hardcoded Master Codes (Replicated from previous backend)
