@@ -35,13 +35,30 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "https://1212-pts-gleo.vercel.app",
-    "https://1212-pts.vercel.app",
-    "https://mt-pt.vercel.app"
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://1212-pts-gleo.vercel.app",
+      "https://1212-pts.vercel.app",
+      "https://mt-pt.vercel.app"
+    ];
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } // Check for local network IPs (192.168.x.x or 10.x.x.x)
+    const isLocalNetwork = /^http:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
+
+    if (isLocalNetwork) {
+      return callback(null, true);
+    }
+
+    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    return callback(new Error(msg), false);
+  },
   credentials: true,
 }));
 app.use(express.json());
