@@ -156,9 +156,12 @@ export default function AdminForm({ onCreated, onUpdated, onCancel, editingText,
         setSuccess(false);
     };
 
+    const [lastError, setLastError] = useState(null); // Add this state at top of component
+
     async function handleSubmit(e) {
         e.preventDefault();
         setSuccess(false);
+        setLastError(null);
         if (!primary.trim()) return alert("Primary text required");
 
         setLoading(true);
@@ -179,7 +182,8 @@ export default function AdminForm({ onCreated, onUpdated, onCancel, editingText,
             setTimeout(() => setSuccess(false), 2000);
         } catch (err) {
             console.error(err);
-            alert(err.message || "Failed to save");
+            setLastError(err.message || "Failed to save");
+            // alert(err.message || "Failed to save"); // fallback
         } finally {
             setLoading(false);
         }
@@ -404,6 +408,12 @@ export default function AdminForm({ onCreated, onUpdated, onCancel, editingText,
                                 {loading ? "..." : (editingText ? "Save Changes" : isMod ? "Submit" : "Create Text")}
                             </button>
                         </div>
+                        {/* Error Display */}
+                        {lastError && (
+                            <div className="mt-3 text-right text-xs font-bold text-red-500 animate-pulse">
+                                {lastError}
+                            </div>
+                        )}
                     </form>
                 </div>
             </div>

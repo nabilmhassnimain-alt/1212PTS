@@ -91,7 +91,7 @@ export async function createText(payload) {
         // Firestore timestamps are objects, usually easier to stick to ISO strings for existing UI compat
     };
 
-    const docRef = await addDoc(collection(db, "texts"), newItem);
+    const docRef = await withTimeout(addDoc(collection(db, "texts"), newItem));
     return { id: docRef.id, ...newItem };
 }
 
