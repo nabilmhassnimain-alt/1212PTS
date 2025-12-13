@@ -327,5 +327,47 @@ export async function deleteVocabularyItem(type, value) {
         [type]: { $exists: true, $ne: [] },
     });
 
+
     return { success: true, updatedTexts: updateCheck };
+}
+
+// ==================== SUGGESTIONS OPERATIONS ====================
+
+export async function addSuggestion(content, author) {
+    const db = getDB();
+    const suggestionsCollection = db.collection("suggestions");
+
+    const newSuggestion = {
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+        content,
+        author,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+    };
+
+    await suggestionsCollection.insertOne(newSuggestion);
+    return newSuggestion;
+}
+
+export async function getSuggestions() {
+    const db = getDB();
+    const suggestionsCollection = db.collection("suggestions");
+    return await suggestionsCollection.find({}).sort({ createdAt: -1 }).toArray();
+}
+
+export async function updateSuggestionStatus(id, status) {
+    const db = getDB();
+    const suggestionsCollection = db.collection("suggestions");
+    return await suggestionsCollection.findOneAndUpdate(
+        { id },
+        { $set: { status } },
+        { returnDocument: "after" }
+    );
+}
+
+export async function deleteSuggestion(id) {
+    const db = getDB();
+    const suggestionsCollection = db.collection("suggestions");
+    const result = await suggestionsCollection.deleteOne({ id });
+    return result.deletedCount > 0;
 }

@@ -154,3 +154,42 @@ export async function updateTextStatus(id, status) {
     if (!res.ok) throw new Error("Failed to update status");
     return res.json();
 }
+
+export async function submitSuggestion(content) {
+    const res = await fetch(`${API_BASE}/suggestions`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+    });
+    if (!res.ok) throw new Error("Failed to submit suggestion");
+    return res.json();
+}
+
+export async function fetchSuggestions() {
+    const res = await fetch(`${API_BASE}/admin/suggestions`, {
+        credentials: "include",
+    });
+    if (!res.ok) throw new Error("Failed to fetch suggestions");
+    return res.json();
+}
+
+export async function updateSuggestionStatus(id, status) {
+    const res = await fetch(`${API_BASE}/admin/suggestions/${id}/status`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error("Failed to update status");
+    return res.json();
+}
+
+export async function deleteSuggestion(id) {
+    const res = await fetch(`${API_BASE}/admin/suggestions/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+    });
+    if (!res.ok) throw new Error("Failed to delete suggestion");
+    return res.json();
+}

@@ -14,12 +14,12 @@ import {
   updateTextStatus,
   deleteCode,
   deleteText,
-  updateText,
-  renameVocabularyItem,
-  deleteVocabularyItem,
-  addVocabularyItem,
   getAllCodes,
-  getVocabulary
+  getVocabulary,
+  addSuggestion,
+  getSuggestions,
+  updateSuggestionStatus,
+  deleteSuggestion
 } from "./dataStore.js";
 import {
   authenticateToken,
@@ -258,6 +258,55 @@ app.delete("/vocabulary/:type", authenticateToken, async (req, res) => {
   }
 });
 
+// Suggestion Routes
+app.post("/suggestions", authenticateToken, async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) return res.status(400).json({ error: "Content required" });
+
+    // Pass role as author for now
+    const author = { role: req.user.role };
+    const saved = await addSuggestion(content, author);
+    res.status(201).json(saved);
+  } catch (error) {
+    console.error("Add suggestion error:", error);
+    res.status(500).json({ error: "Failed to add suggestion" });
+  }
+});
+
+app.get("/admin/suggestions", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const items = await getSuggestions();
+    res.json(items);
+  } catch (error) {
+    console.error("Get suggestions error:", error);
+    res.status(500).json({ error: "Failed to retrieve suggestions" });
+  }
+});
+
+app.put("/admin/suggestions/:id/status", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const updated = await updateSuggestionStatus(req.params.id, status);
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Suggestion not found" });
+  } catch (error) {
+    console.error("Update suggestion status error:", error);
+    res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+app.delete("/admin/suggestions/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const deleted = await deleteSuggestion(req.params.id);
+    if (deleted) res.json({ message: "Suggestion deleted" });
+    else res.status(404).json({ error: "Suggestion not found" });
+  } catch (error) {
+    console.error("Delete suggestion error:", error);
+    res.status(500).json({ error: "Failed to delete suggestion" });
+  }
+});
+
 // Texts Routes
 app.get("/texts", authenticateToken, async (req, res) => {
   try {
@@ -342,8 +391,8 @@ app.delete("/texts/:id", authenticateToken, isAdmin, async (req, res) => {
 // For local development
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 4000;
-  app.listen(PORT, () => {
-    console.log(`🚀 API listening on http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 API listening on http://0.0.0.0:${PORT}`);
   });
 }
 
