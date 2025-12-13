@@ -69,11 +69,13 @@ export async function fetchTexts() {
 
 export async function createText(payload) {
     if (!payload.primary) throw new Error("Primary text required");
+    console.log("Creating text with payload:", payload); // DEBUG
     const newItem = {
         ...payload,
         status: 'pending',
         createdAt: new Date().toISOString()
     };
+    console.log("Saving to Firestore:", newItem); // DEBUG
     const docRef = await withTimeout(addDoc(collection(db, "texts"), newItem));
     return { id: docRef.id, ...newItem };
 }
