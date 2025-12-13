@@ -81,8 +81,8 @@ export default function SuggestionManager() {
                                 <div
                                     key={suggestion.id}
                                     className={`flex gap-3 p-4 rounded-xl border transition-all ${suggestion.status === 'implemented'
-                                            ? 'bg-emerald-50/50 border-emerald-100 opacity-75'
-                                            : 'bg-white/80 border-amber-100 shadow-sm'
+                                        ? 'bg-emerald-50/50 border-emerald-100 opacity-75'
+                                        : 'bg-white/80 border-amber-100 shadow-sm'
                                         }`}
                                 >
                                     <div className="flex-1 min-w-0">
@@ -92,9 +92,8 @@ export default function SuggestionManager() {
                                                 {new Date(suggestion.createdAt).toLocaleDateString()}
                                             </span>
                                             <span className="text-[10px] font-bold text-indigo-400 px-1.5 py-0.5 bg-indigo-50 rounded">
-                                                {suggestion.author?.role || 'User'}
-                                            </span>
-                                        </div>
+                                                {suggestion.author?.label ? `${suggestion.author.label} (${suggestion.author.role})` : suggestion.author?.role || 'User'}
+                                            </span>                                        </div>
                                         <p className={`text-sm text-slate-700 whitespace-pre-wrap ${suggestion.status === 'implemented' ? 'line-through text-slate-500' : ''}`}>
                                             {suggestion.content}
                                         </p>

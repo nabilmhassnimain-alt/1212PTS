@@ -92,15 +92,28 @@ app.post("/auth/login", async (req, res) => {
     console.log("Login attempt with code:", code);
 
     let role = null;
-    if (ADMIN_CODES.includes(code)) role = "admin";
-    else if (USER_CODES.includes(code)) role = "user";
+    let label = null;
 
-    if (!role) role = await getCodeRole(code);
+    if (ADMIN_CODES.includes(code)) {
+      role = "admin";
+      label = "Admin";
+    } else if (USER_CODES.includes(code)) {
+      role = "user";
+      label = "User";
+    }
 
-    console.log("Determined role:", role);
+    if (!role) {
+      const record = await getCodeRecord(code);
+      if (record) {
+        role = record.role;
+        label = record.label;
+      }
+    }
+
+    console.log("Determined role:", role, "Label:", label);
 
     if (role) {
-      const token = generateToken({ role });
+      const token = generateToken({ role, label, code }); // Include label and code in token
 
       const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
       res.cookie("token", token, {
@@ -109,7 +122,7 @@ app.post("/auth/login", async (req, res) => {
         sameSite: isProduction ? "none" : "lax", // 'none' allows cross-site cookies
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
       });
-      return res.json({ role });
+      return res.json({ role, label });
 
     }
     return res.status(401).json({ error: "Invalid code" });
@@ -120,7 +133,7 @@ app.post("/auth/login", async (req, res) => {
 });
 
 app.get("/auth/me", authenticateToken, (req, res) => {
-  res.json({ role: req.user.role });
+  res.json({ role: req.user.role, label: req.user.label });
 });
 
 app.post("/auth/logout", (req, res) => {
@@ -264,8 +277,11 @@ app.post("/suggestions", authenticateToken, async (req, res) => {
     const { content } = req.body;
     if (!content) return res.status(400).json({ error: "Content required" });
 
-    // Pass role as author for now
-    const author = { role: req.user.role };
+    // Store role and label in author object
+    const author = {
+      role: req.user.role,
+      label: req.user.label || null
+    };
     const saved = await addSuggestion(content, author);
     res.status(201).json(saved);
   } catch (error) {
