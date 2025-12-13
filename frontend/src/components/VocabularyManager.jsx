@@ -52,8 +52,9 @@ export default function VocabularyManager({ isOpen, onClose, type, items, onRefr
             await deleteVocabularyItem(type, deletingItem);
             onRefresh();
             setDeletingItem(null);
-        } catch (e) {
-            setError("Failed to delete item. Please try again.");
+        } catch (err) {
+            setError(err.message || "Failed to delete item. Please try again.");
+            console.error(err);
         }
     };
 

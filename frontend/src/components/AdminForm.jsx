@@ -177,8 +177,9 @@ export default function AdminForm({ onCreated, onUpdated, onCancel, editingText,
             }
             loadVocab();
             setTimeout(() => setSuccess(false), 2000);
-        } catch {
-            alert("Failed to save");
+        } catch (err) {
+            console.error(err);
+            alert(err.message || "Failed to save");
         } finally {
             setLoading(false);
         }
