@@ -150,7 +150,10 @@ export async function renameVocabularyItem(type, oldVal, newVal) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ oldVal, newVal }),
     });
-    if (!res.ok) throw new Error("Failed to rename item");
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to rename item");
+    }
     return res.json();
 }
 
@@ -161,7 +164,10 @@ export async function deleteVocabularyItem(type, val) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value: val }),
     });
-    if (!res.ok) throw new Error("Failed to delete item");
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to delete item");
+    }
     return res.json();
 }
 
