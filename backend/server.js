@@ -59,6 +59,15 @@ app.use(async (req, res, next) => {
 });
 
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    mongodb: !!process.env.MONGODB_URI,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Auth Routes
 app.post("/auth/login", async (req, res) => {
   try {
