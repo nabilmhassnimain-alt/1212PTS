@@ -1,5 +1,8 @@
 // Production build
-const API_BASE = import.meta.env.VITE_API_URL || `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:4000`;
+// If VITE_API_URL is set, use it. Otherwise, if we are on Vercel (production), use relative /api path. 
+// Fallback to dynamic local IP for local development.
+const isVercel = import.meta.env.PROD;
+const API_BASE = import.meta.env.VITE_API_URL || (isVercel ? "/api" : `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:4000`);
 
 export async function loginWithCode(code) {
     const res = await fetch(`${API_BASE}/auth/login`, {
