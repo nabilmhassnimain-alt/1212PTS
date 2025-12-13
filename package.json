@@ -1,0 +1,12 @@
+{
+    "name": "translation-app-monorepo",
+    "private": true,
+    "engines": {
+        "node": "18.x"
+    },
+    "scripts": {
+        "build": "cd frontend && npm install && npm run build",
+        "f-install": "cd frontend && npm install",
+        "b-install": "cd backend && npm install"
+    }
+}

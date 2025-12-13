@@ -11,7 +11,10 @@ export async function loginWithCode(code) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
     });
-    if (!res.ok) throw new Error("Invalid code");
+    if (!res.ok) {
+        if (res.status === 404) throw new Error("Server not found (404) - check Vercel Root");
+        throw new Error("Invalid code");
+    }
     return res.json();
 }
 

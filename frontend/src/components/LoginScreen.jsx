@@ -12,7 +12,8 @@ export default function LoginScreen({ onLogin }) {
             const { role } = await loginWithCode(code.trim());
             onLogin({ role });
         } catch (err) {
-            setError("Invalid code");
+            console.error("Login Error details:", err);
+            setError(err.message || "Invalid code");
         }
     }
 
