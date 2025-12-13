@@ -11,11 +11,9 @@
         }
     ],
     "functions": {
-        "functions": {
-            "backend/server.js": {
-                "maxDuration": 10,
-                "memory": 1024
-            }
+        "backend/server.js": {
+            "maxDuration": 10,
+            "memory": 1024
         }
     }
 }
