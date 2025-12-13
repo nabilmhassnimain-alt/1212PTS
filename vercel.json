@@ -11,8 +11,11 @@
         }
     ],
     "functions": {
-        "backend/server.js": {
-            "includeFiles": "backend/**"
+        "functions": {
+            "backend/server.js": {
+                "maxDuration": 10,
+                "memory": 1024
+            }
         }
     }
 }
