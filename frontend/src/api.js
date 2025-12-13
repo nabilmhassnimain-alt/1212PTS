@@ -4,6 +4,38 @@
 const isVercel = import.meta.env.PROD;
 const API_BASE = import.meta.env.VITE_API_URL || (isVercel ? "/api" : `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:4000`);
 
+/**
+ * Helper to handle response and parsed JSON errors
+ */
+async function handleResponse(res, defaultMsg) {
+    if (!res.ok) {
+        // Try to parse JSON error from server
+        try {
+            const errData = await res.json();
+            const serverMsg = errData.error || errData.message; // some servers use .message
+            if (serverMsg) throw new Error(serverMsg);
+
+            // Special handling for debug info if present (mostly for login)
+            if (errData.debug) {
+                const d = errData.debug;
+                throw new Error(`Invalid: '${d.received}' (Len:${d.receivedLength}). EnvVars: Admin=${d.adminCodesLength}, User=${d.userCodesLength}`);
+            }
+        } catch (e) {
+            // If the error we just threw is "Invalid: ...", propagate it
+            if (e.message && (e.message.startsWith("Invalid:") || e.message !== defaultMsg)) {
+                throw e;
+            }
+            // If json() failed or no error field, throw default (or standard status text)
+        }
+        throw new Error(defaultMsg || `Request failed (${res.status})`);
+    }
+    // For DELETE/PUT that might return empty body
+    if (res.status === 204) return null;
+    return res.json().catch(() => ({})); // Handle empty JSON safely
+}
+
+// ==================== AUTH ====================
+
 export async function loginWithCode(code) {
     const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
@@ -11,34 +43,11 @@ export async function loginWithCode(code) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
     });
-    if (!res.ok) {
-        if (res.status === 404) throw new Error("Server not found (404) - check Vercel Root");
-
-        // Try to extract debug info from server response
-        try {
-            const errData = await res.json();
-            if (errData.debug) {
-                const d = errData.debug;
-                // Format debug info for display
-                throw new Error(`Invalid: '${d.received}' (Len:${d.receivedLength}). EnvVars: Admin=${d.adminCodesLength}, User=${d.userCodesLength}`);
-            }
-        } catch (e) {
-            // If we successfully created a debug error, re-throw it
-            if (e.message.startsWith("Invalid:")) throw e;
-            // Otherwise ignore JSON parse errors and throw generic
-        }
-
-        throw new Error("Invalid code");
+    // Keep custom 404 check for login as it's a common config issue
+    if (!res.ok && res.status === 404) {
+        throw new Error("Server not found (404) - check Vercel Root");
     }
-    return res.json();
-}
-
-export async function fetchMe() {
-    const res = await fetch(`${API_BASE}/auth/me`, {
-        credentials: "include",
-    });
-    if (!res.ok) return null;
-    return res.json();
+    return handleResponse(res, "Invalid code");
 }
 
 export async function logout() {
@@ -48,12 +57,21 @@ export async function logout() {
     });
 }
 
+export async function fetchMe() {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+        credentials: "include",
+    });
+    if (!res.ok) return null; // silent fail for me
+    return res.json();
+}
+
+// ==================== TEXTS ====================
+
 export async function fetchTexts() {
     const res = await fetch(`${API_BASE}/texts`, {
         credentials: "include",
     });
-    if (!res.ok) throw new Error("Not authorized");
-    return res.json();
+    return handleResponse(res, "Not authorized");
 }
 
 export async function createText(payload) {
@@ -63,8 +81,7 @@ export async function createText(payload) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error("Failed to create");
-    return res.json();
+    return handleResponse(res, "Failed to create text");
 }
 
 export async function updateText(id, payload) {
@@ -74,101 +91,7 @@ export async function updateText(id, payload) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error("Failed to update");
-    return res.json();
-}
-
-export async function generateCode(role, label = "") {
-    const res = await fetch(`${API_BASE}/auth/generate`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, label }),
-    });
-    if (!res.ok) throw new Error("Failed to generate code");
-    return res.json();
-}
-
-export async function approveText(id) {
-    const res = await fetch(`${API_BASE}/texts/${id}/approve`, {
-        method: "PUT",
-        credentials: "include",
-    });
-    if (!res.ok) throw new Error("Failed to approve");
-    return res.json();
-}
-
-export async function fetchCodes() {
-    const res = await fetch(`${API_BASE}/admin/codes`, {
-        credentials: "include",
-    });
-    if (!res.ok) throw new Error("Failed to fetch codes");
-    return res.json();
-}
-
-export async function deleteCode(codeId) {
-    const res = await fetch(`${API_BASE}/admin/codes/${codeId}`, {
-        method: "DELETE",
-        credentials: "include",
-    });
-    if (!res.ok) throw new Error("Failed to delete code");
-    return res.json();
-}
-
-export async function updateCodeLabel(codeId, label) {
-    const res = await fetch(`${API_BASE}/admin/codes/${codeId}/label`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label }),
-    });
-    if (!res.ok) throw new Error("Failed to update label");
-    return res.json();
-}
-
-export async function deleteText(id) {
-    const res = await fetch(`${API_BASE}/texts/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-    });
-    if (!res.ok) throw new Error("Failed to delete text");
-    return res.json();
-}
-
-export async function fetchVocabulary() {
-    const res = await fetch(`${API_BASE}/vocabulary`, {
-        credentials: "include",
-    });
-    if (!res.ok) throw new Error("Failed to fetch vocabulary");
-    return res.json();
-}
-
-export async function renameVocabularyItem(type, oldVal, newVal) {
-    const res = await fetch(`${API_BASE}/vocabulary/${type}`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ oldVal, newVal }),
-    });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to rename item");
-    }
-    return res.json();
-}
-
-export async function deleteVocabularyItem(type, val) {
-    const res = await fetch(`${API_BASE}/vocabulary/${type}`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: val }),
-    });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to delete item");
-    }
-    return res.json();
+    return handleResponse(res, "Failed to update text");
 }
 
 export async function updateTextStatus(id, status) {
@@ -178,8 +101,108 @@ export async function updateTextStatus(id, status) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
     });
-    if (!res.ok) throw new Error("Failed to update status");
-    return res.json();
+    return handleResponse(res, "Failed to update status");
+}
+
+export async function approveText(id) {
+    const res = await fetch(`${API_BASE}/texts/${id}/approve`, {
+        method: "PUT",
+        credentials: "include",
+    });
+    return handleResponse(res, "Failed to approve");
+}
+
+export async function deleteText(id) {
+    const res = await fetch(`${API_BASE}/texts/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+    });
+    return handleResponse(res, "Failed to delete text");
+}
+
+// ==================== CODES ====================
+
+export async function fetchCodes() {
+    const res = await fetch(`${API_BASE}/admin/codes`, {
+        credentials: "include",
+    });
+    return handleResponse(res, "Failed to fetch codes");
+}
+
+export async function generateCode(role, label = "") {
+    const res = await fetch(`${API_BASE}/auth/generate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, label }),
+    });
+    return handleResponse(res, "Failed to generate code");
+}
+
+export async function deleteCode(codeId) {
+    const res = await fetch(`${API_BASE}/admin/codes/${codeId}`, {
+        method: "DELETE",
+        credentials: "include",
+    });
+    return handleResponse(res, "Failed to delete code");
+}
+
+export async function updateCodeLabel(codeId, label) {
+    const res = await fetch(`${API_BASE}/admin/codes/${codeId}/label`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label }),
+    });
+    return handleResponse(res, "Failed to update label");
+}
+
+// ==================== VOCABULARY ====================
+
+export async function fetchVocabulary() {
+    const res = await fetch(`${API_BASE}/vocabulary`, {
+        credentials: "include",
+    });
+    return handleResponse(res, "Failed to fetch vocabulary");
+}
+
+export async function addVocabularyItem(type, value) {
+    const res = await fetch(`${API_BASE}/vocabulary/${type}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value }),
+    });
+    return handleResponse(res, "Failed to add item");
+}
+
+export async function renameVocabularyItem(type, oldVal, newVal) {
+    const res = await fetch(`${API_BASE}/vocabulary/${type}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldVal, newVal }),
+    });
+    return handleResponse(res, "Failed to rename item");
+}
+
+export async function deleteVocabularyItem(type, val) {
+    const res = await fetch(`${API_BASE}/vocabulary/${type}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: val }),
+    });
+    return handleResponse(res, "Failed to delete item");
+}
+
+// ==================== SUGGESTIONS ====================
+
+export async function fetchSuggestions() {
+    const res = await fetch(`${API_BASE}/admin/suggestions`, {
+        credentials: "include",
+    });
+    return handleResponse(res, "Failed to fetch suggestions");
 }
 
 export async function submitSuggestion(content) {
@@ -189,16 +212,7 @@ export async function submitSuggestion(content) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
     });
-    if (!res.ok) throw new Error("Failed to submit suggestion");
-    return res.json();
-}
-
-export async function fetchSuggestions() {
-    const res = await fetch(`${API_BASE}/admin/suggestions`, {
-        credentials: "include",
-    });
-    if (!res.ok) throw new Error("Failed to fetch suggestions");
-    return res.json();
+    return handleResponse(res, "Failed to submit suggestion");
 }
 
 export async function updateSuggestionStatus(id, status) {
@@ -208,8 +222,7 @@ export async function updateSuggestionStatus(id, status) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
     });
-    if (!res.ok) throw new Error("Failed to update status");
-    return res.json();
+    return handleResponse(res, "Failed to update status");
 }
 
 export async function deleteSuggestion(id) {
@@ -217,6 +230,5 @@ export async function deleteSuggestion(id) {
         method: "DELETE",
         credentials: "include",
     });
-    if (!res.ok) throw new Error("Failed to delete suggestion");
-    return res.json();
+    return handleResponse(res, "Failed to delete suggestion");
 }
