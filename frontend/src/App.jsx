@@ -12,7 +12,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [texts, setTexts] = useState([]);
   const [editingText, setEditingText] = useState(null);
-  const [error, setError] = useState(null);
 
   // Refs for navigation
   const formRef = useRef(null);
@@ -45,7 +44,6 @@ function App() {
       setTexts(data);
     } catch (e) {
       console.error(e);
-      setError(e.message);
     }
   }
 
@@ -196,11 +194,6 @@ function App() {
 
       <SuggestionBox user={user} />
 
-      {/* Debug Info for Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black/80 text-white text-[10px] p-2 text-center pointer-events-none z-[100]">
-        API: {import.meta.env.VITE_API_URL || `http://${window.location.hostname}:4000`} |
-        {error ? <span className="text-red-400 font-bold"> Error: {error}</span> : <span className="text-green-400"> Status: OK</span>}
-      </div>
     </div>
   );
 }
