@@ -84,8 +84,16 @@ app.post("/auth/login", async (req, res) => {
 
     if (role) {
       const token = generateToken({ role });
-      res.cookie("token", token, { httpOnly: true, secure: false, sameSite: "lax" });
+
+      const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+      res.cookie("token", token, {
+        httpOnly: true,
+        secure: isProduction, // Secure is required for SameSite: 'none'
+        sameSite: isProduction ? "none" : "lax", // 'none' allows cross-site cookies
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      });
       return res.json({ role });
+
     }
     return res.status(401).json({ error: "Invalid code" });
   } catch (error) {
@@ -99,9 +107,15 @@ app.get("/auth/me", authenticateToken, (req, res) => {
 });
 
 app.post("/auth/logout", (req, res) => {
-  res.clearCookie("token");
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax"
+  });
   res.json({ message: "Logged out" });
 });
+
 
 app.post("/auth/generate", authenticateToken, isAdmin, async (req, res) => {
   try {
