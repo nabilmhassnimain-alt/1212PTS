@@ -6,7 +6,14 @@
     },
     "scripts": {
         "build": "cd frontend && npm install && npm run build",
-        "f-install": "cd frontend && npm install",
-        "b-install": "cd backend && npm install"
+        "postinstall": "cd frontend && npm install"
+    },
+    "dependencies": {
+        "cookie-parser": "^1.4.6",
+        "cors": "^2.8.5",
+        "dotenv": "^16.3.1",
+        "express": "^4.18.2",
+        "jsonwebtoken": "^9.0.2",
+        "mongodb": "^6.3.0"
     }
 }
