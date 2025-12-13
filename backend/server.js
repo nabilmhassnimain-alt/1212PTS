@@ -76,8 +76,11 @@ app.use(async (req, res, next) => {
 });
 
 
+// Create a router for all API routes
+const router = express.Router();
+
 // Health check endpoint
-app.get("/health", (req, res) => {
+router.get("/health", (req, res) => {
   res.json({
     status: "ok",
     mongodb: !!process.env.MONGODB_URI,
@@ -86,7 +89,7 @@ app.get("/health", (req, res) => {
 });
 
 // Auth Routes
-app.post("/auth/login", async (req, res) => {
+router.post("/auth/login", async (req, res) => {
   try {
     const code = (req.body.code || "").trim();
     console.log("Login attempt with code:", code);
@@ -132,11 +135,11 @@ app.post("/auth/login", async (req, res) => {
   }
 });
 
-app.get("/auth/me", authenticateToken, (req, res) => {
+router.get("/auth/me", authenticateToken, (req, res) => {
   res.json({ role: req.user.role, label: req.user.label });
 });
 
-app.post("/auth/logout", (req, res) => {
+router.post("/auth/logout", (req, res) => {
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
   res.clearCookie("token", {
     httpOnly: true,
@@ -147,7 +150,7 @@ app.post("/auth/logout", (req, res) => {
 });
 
 
-app.post("/auth/generate", authenticateToken, isAdmin, async (req, res) => {
+router.post("/auth/generate", authenticateToken, isAdmin, async (req, res) => {
   try {
     const { role, label } = req.body;
     if (!['mod', 'user'].includes(role)) {
@@ -168,7 +171,7 @@ app.post("/auth/generate", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-app.get("/admin/codes", authenticateToken, isAdmin, async (req, res) => {
+router.get("/admin/codes", authenticateToken, isAdmin, async (req, res) => {
   try {
     const activeCodes = await getAllCodes(false);
     res.json(activeCodes);
@@ -179,7 +182,7 @@ app.get("/admin/codes", authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Revoke code by ID
-app.delete("/admin/codes/:id", authenticateToken, isAdmin, async (req, res) => {
+router.delete("/admin/codes/:id", authenticateToken, isAdmin, async (req, res) => {
   try {
     const revoked = await revokeCode(req.params.id);
     if (revoked) res.json(revoked);
@@ -191,7 +194,7 @@ app.delete("/admin/codes/:id", authenticateToken, isAdmin, async (req, res) => {
 });
 
 // Update code label
-app.put("/admin/codes/:id/label", authenticateToken, isAdmin, async (req, res) => {
+router.put("/admin/codes/:id/label", authenticateToken, isAdmin, async (req, res) => {
   try {
     const { label } = req.body;
     const updated = await updateCodeLabel(req.params.id, label);
@@ -204,7 +207,7 @@ app.put("/admin/codes/:id/label", authenticateToken, isAdmin, async (req, res) =
 });
 
 // Vocabulary Routes
-app.get("/vocabulary", authenticateToken, async (req, res) => {
+router.get("/vocabulary", authenticateToken, async (req, res) => {
   try {
     const vocab = await getVocabulary();
     res.json(vocab);
@@ -214,7 +217,7 @@ app.get("/vocabulary", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/vocabulary/:type", authenticateToken, async (req, res) => {
+router.post("/vocabulary/:type", authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'mod') {
       return res.status(403).json({ error: "Forbidden" });
@@ -233,7 +236,7 @@ app.post("/vocabulary/:type", authenticateToken, async (req, res) => {
   }
 });
 
-app.put("/vocabulary/:type", authenticateToken, async (req, res) => {
+router.put("/vocabulary/:type", authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'mod') {
       return res.status(403).json({ error: "Forbidden" });
@@ -252,7 +255,7 @@ app.put("/vocabulary/:type", authenticateToken, async (req, res) => {
   }
 });
 
-app.delete("/vocabulary/:type", authenticateToken, async (req, res) => {
+router.delete("/vocabulary/:type", authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'mod') {
       return res.status(403).json({ error: "Forbidden" });
@@ -272,7 +275,7 @@ app.delete("/vocabulary/:type", authenticateToken, async (req, res) => {
 });
 
 // Suggestion Routes
-app.post("/suggestions", authenticateToken, async (req, res) => {
+router.post("/suggestions", authenticateToken, async (req, res) => {
   try {
     const { content } = req.body;
     if (!content) return res.status(400).json({ error: "Content required" });
@@ -290,7 +293,7 @@ app.post("/suggestions", authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/admin/suggestions", authenticateToken, isAdmin, async (req, res) => {
+router.get("/admin/suggestions", authenticateToken, isAdmin, async (req, res) => {
   try {
     const items = await getSuggestions();
     res.json(items);
@@ -300,7 +303,7 @@ app.get("/admin/suggestions", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-app.put("/admin/suggestions/:id/status", authenticateToken, isAdmin, async (req, res) => {
+router.put("/admin/suggestions/:id/status", authenticateToken, isAdmin, async (req, res) => {
   try {
     const { status } = req.body;
     const updated = await updateSuggestionStatus(req.params.id, status);
@@ -312,7 +315,7 @@ app.put("/admin/suggestions/:id/status", authenticateToken, isAdmin, async (req,
   }
 });
 
-app.delete("/admin/suggestions/:id", authenticateToken, isAdmin, async (req, res) => {
+router.delete("/admin/suggestions/:id", authenticateToken, isAdmin, async (req, res) => {
   try {
     const deleted = await deleteSuggestion(req.params.id);
     if (deleted) res.json({ message: "Suggestion deleted" });
@@ -324,7 +327,7 @@ app.delete("/admin/suggestions/:id", authenticateToken, isAdmin, async (req, res
 });
 
 // Texts Routes
-app.get("/texts", authenticateToken, async (req, res) => {
+router.get("/texts", authenticateToken, async (req, res) => {
   try {
     if (req.user.role === 'admin') {
       const texts = await getAllTexts();
@@ -339,7 +342,7 @@ app.get("/texts", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/texts", authenticateToken, async (req, res) => {
+router.post("/texts", authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'mod') {
       return res.status(403).json({ error: "Forbidden" });
@@ -366,7 +369,7 @@ app.post("/texts", authenticateToken, async (req, res) => {
   }
 });
 
-app.put("/texts/:id/approve", authenticateToken, isAdmin, async (req, res) => {
+router.put("/texts/:id/approve", authenticateToken, isAdmin, async (req, res) => {
   try {
     const updated = await updateTextStatus(req.params.id, 'active');
     if (updated) res.json(updated);
@@ -377,7 +380,7 @@ app.put("/texts/:id/approve", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-app.put("/texts/:id", authenticateToken, async (req, res) => {
+router.put("/texts/:id", authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'mod') {
       return res.status(403).json({ error: "Forbidden" });
@@ -393,7 +396,7 @@ app.put("/texts/:id", authenticateToken, async (req, res) => {
   }
 });
 
-app.delete("/texts/:id", authenticateToken, isAdmin, async (req, res) => {
+router.delete("/texts/:id", authenticateToken, isAdmin, async (req, res) => {
   try {
     const deleted = await deleteText(req.params.id);
     if (deleted) res.json({ message: "Text deleted" });
@@ -403,6 +406,10 @@ app.delete("/texts/:id", authenticateToken, isAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to delete text" });
   }
 });
+
+// Mount the router on both / and /api to handle Vercel rewrites correctly
+app.use('/', router);
+app.use('/api', router);
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
