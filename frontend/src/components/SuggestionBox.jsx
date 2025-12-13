@@ -56,7 +56,7 @@ export default function SuggestionBox({ user }) {
                         <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
                             <span className="text-2xl">💡</span> Suggestion Box
                         </h3>
-                        <p className="text-slate-500 text-sm mb-4">Have an idea for the app? Let the admins know! This is like a wishlist for future updates.</p>
+                        <p className="text-slate-500 text-sm mb-4">Got a cool idea? We'd love to hear it! Help us build the wishlist for future updates.</p>
 
                         {success ? (
                             <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl flex items-center gap-3 animate-pulse">
