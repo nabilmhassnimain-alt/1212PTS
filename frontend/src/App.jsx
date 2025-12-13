@@ -52,7 +52,7 @@ function App() {
   };
 
   const handleUpdated = (updatedText) => {
-    setTexts(prev => prev.map(t => t.id === updatedText.id ? updatedText : t));
+    setTexts(prev => prev.map(t => t.id === updatedText.id ? { ...t, ...updatedText } : t));
     setEditingText(null);
   };
 
