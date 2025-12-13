@@ -13,6 +13,21 @@ export async function loginWithCode(code) {
     });
     if (!res.ok) {
         if (res.status === 404) throw new Error("Server not found (404) - check Vercel Root");
+
+        // Try to extract debug info from server response
+        try {
+            const errData = await res.json();
+            if (errData.debug) {
+                const d = errData.debug;
+                // Format debug info for display
+                throw new Error(`Invalid: '${d.received}' (Len:${d.receivedLength}). EnvVars: Admin=${d.adminCodesLength}, User=${d.userCodesLength}`);
+            }
+        } catch (e) {
+            // If we successfully created a debug error, re-throw it
+            if (e.message.startsWith("Invalid:")) throw e;
+            // Otherwise ignore JSON parse errors and throw generic
+        }
+
         throw new Error("Invalid code");
     }
     return res.json();
