@@ -115,7 +115,12 @@ app.post("/auth/generate", authenticateToken, isAdmin, async (req, res) => {
     res.json(codeRecord);
   } catch (error) {
     console.error("Generate code error:", error);
-    return res.status(500).json({ error: "Failed to generate code" });
+    // Return detailed error for debugging
+    return res.status(500).json({
+      error: "Failed to generate code",
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -258,7 +263,10 @@ app.post("/texts", authenticateToken, async (req, res) => {
     res.status(201).json(newItem);
   } catch (error) {
     console.error("Add text error:", error);
-    return res.status(500).json({ error: "Failed to create text" });
+    return res.status(500).json({
+      error: "Failed to create text",
+      details: error.message
+    });
   }
 });
 
