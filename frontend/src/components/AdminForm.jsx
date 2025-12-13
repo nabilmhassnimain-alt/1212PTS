@@ -264,7 +264,7 @@ export default function AdminForm({ onCreated, onUpdated, onCancel, editingText,
             }
 
         } catch (error) {
-            alert('Import failed: ' + error.message);
+            alert('Import failed: ' + (error.message || 'Unknown error'));
         } finally {
             setImporting(false);
         }

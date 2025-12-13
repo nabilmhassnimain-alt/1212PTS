@@ -44,8 +44,8 @@ export default function CodeManager() {
             navigator.clipboard.writeText(created.code);
             setCopiedId(created.id);
             setTimeout(() => setCopiedId(null), 2000);
-        } catch {
-            alert("Failed to generate code");
+        } catch (e) {
+            alert(e.message || "Failed to generate code");
         } finally {
             setLoading(false);
         }
@@ -56,8 +56,8 @@ export default function CodeManager() {
         try {
             await deleteCode(codeId);
             setCodes(prev => prev.filter(c => c.id !== codeId));
-        } catch {
-            alert("Failed to revoke code");
+        } catch (e) {
+            alert(e.message || "Failed to revoke code");
         }
     }
 
@@ -66,8 +66,8 @@ export default function CodeManager() {
             await updateCodeLabel(codeId, label);
             setCodes(prev => prev.map(c => c.id === codeId ? { ...c, label } : c));
             setEditingLabel(null);
-        } catch {
-            alert("Failed to update label");
+        } catch (e) {
+            alert(e.message || "Failed to update label");
         }
     }
 

@@ -81,7 +81,7 @@ export default function TextList({ texts, canCopyOnly, onApprove, isAdmin, isMod
                 await deleteText(id);
                 if (onDeleted) onDeleted(id);
             } catch (e) {
-                alert('Failed to delete text');
+                alert(e.message || 'Failed to delete text');
             }
         }
     }

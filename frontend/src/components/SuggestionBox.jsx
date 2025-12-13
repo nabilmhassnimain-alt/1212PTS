@@ -21,7 +21,7 @@ export default function SuggestionBox({ user }) {
                 setIsOpen(false);
             }, 2000);
         } catch (err) {
-            alert("Failed to submit suggestion");
+            alert(err.message || "Failed to submit suggestion");
         } finally {
             setLoading(false);
         }

@@ -39,7 +39,7 @@ export default function SuggestionManager() {
             await deleteSuggestion(id);
             setSuggestions(prev => prev.filter(s => s.id !== id));
         } catch (e) {
-            alert("Failed to delete");
+            alert(e.message || "Failed to delete");
         }
     }
 
